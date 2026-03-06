@@ -1,6 +1,6 @@
 {
   "name": "@DandyJoshua14/guru-custom-auth-system",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Unified auth library supporting Supabase, Firebase, and custom auth with a single init() API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
