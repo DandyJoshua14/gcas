@@ -8,19 +8,102 @@ A unified auth library you can deploy to npm. One `auth` object with `init()` th
 npm install guru-custom-auth-system
 ```
 
-Then install the provider(s) you use (peer dependencies):
+**Supabase** and **Firebase** are included as dependencies, so you don't need to install them separately. The library is written in TypeScript and ships with type definitions.
+
+## Testing the library locally
+
+### 1. Install and build
+
+From the project root:
 
 ```bash
-# For Supabase
-npm install @supabase/supabase-js
-
-# For Firebase
-npm install firebase
-
-# Custom auth has no extra dependency
+npm install
+npm run build
 ```
 
+This compiles TypeScript to `dist/cjs` (CommonJS) and `dist/esm` (ESM).
+
+### 2. Run a quick test (Node)
+
+Create a small test file, e.g. `test-local.js` in the project root:
+
+```js
+const { auth } = require('./dist/cjs/index.js');
+
+// Test with custom adapter (no real backend needed)
+auth.init({
+  type: 'custom',
+  adapter: {
+    async getUser() {
+      return { id: '1', email: 'test@example.com' };
+    },
+    async getSession() {
+      return { user: { id: '1' } };
+    },
+    async signInWithPassword(email, password) {
+      return { user: { id: '1', email }, session: {} };
+    },
+    async signUp() {
+      return { user: { id: '1' }, session: {} };
+    },
+    async signOut() {},
+    onAuthStateChange(cb) {
+      return () => {};
+    },
+  },
+});
+
+(async () => {
+  console.log('isInitialized:', auth.isInitialized);
+  console.log('getUser:', await auth.getUser());
+  console.log('getSession:', await auth.getSession());
+  console.log('OK – library works locally');
+})();
+```
+
+Run it:
+
+```bash
+node test-local.js
+```
+
+### 3. Test in another project (npm link)
+
+From this repo:
+
+```bash
+npm run build
+npm link
+```
+
+From your other project:
+
+```bash
+npm link guru-custom-auth-system
+```
+
+Then `require('guru-custom-auth-system')` or `import { auth } from 'guru-custom-auth-system'` will use your local build. Run `npm run build` in the library repo after changes.
+
+### 4. Test with Supabase or Firebase (optional)
+
+Use real credentials in your test script and call `auth.init()` with `type: 'supabase'` or `type: 'firebase'`, then try `auth.signInWithPassword()`, `auth.getUser()`, etc., against your project.
+
 ## Usage
+
+### TypeScript
+
+The package exports full TypeScript types. Use the credential types for type-safe `init()`:
+
+```ts
+import { auth, type SupabaseCredentials, type FirebaseCredentials } from 'guru-custom-auth-system';
+
+const supabaseCreds: SupabaseCredentials = {
+  type: 'supabase',
+  url: process.env.SUPABASE_URL!,
+  anonKey: process.env.SUPABASE_ANON_KEY!,
+};
+auth.init(supabaseCreds);
+```
 
 ### Init (required)
 
@@ -119,20 +202,78 @@ const app = auth.getClient();
 const firebaseAuth = auth.getAuth();
 ```
 
-## API summary
+## Functions reference
 
-| Method / property       | Description |
-|------------------------|-------------|
-| `auth.init(credentials)` | Initialize with Supabase, Firebase, or custom credentials. |
-| `auth.getProvider()`   | Get the current provider instance. |
-| `auth.isInitialized`   | `true` after a successful `init()`. |
-| `auth.getClient()`     | Underlying client (Supabase client, Firebase app, or custom). |
-| `auth.getUser()`       | Current user or `null`. |
-| `auth.getSession()`    | Current session (provider-specific). |
-| `auth.signInWithPassword(email, password)` | Sign in. |
-| `auth.signUp(email, password, options?)`   | Sign up. |
-| `auth.signOut()`       | Sign out. |
-| `auth.onAuthStateChange(callback)` | Subscribe to auth state; returns unsubscribe. |
+All of these are on the `auth` object after you import/require the library. Call `auth.init(credentials)` once before using the rest.
+
+### Initialization & state
+
+| Function | Description |
+|----------|-------------|
+| `auth.init(credentials)` | Initialize auth. `credentials` must have `type: 'supabase' \| 'firebase' \| 'custom'` and the right fields for that type. Returns the provider instance. |
+| `auth.getProvider()` | Returns the current provider instance. Throws if not initialized. |
+| `auth.isInitialized` | Read-only. `true` after a successful `init()`. |
+
+### Underlying client
+
+| Function | Description |
+|----------|-------------|
+| `auth.getClient()` | Returns the underlying SDK client (Supabase client, Firebase app, or your custom client). |
+| `auth.getAdminClient()` | **Supabase only.** Returns the admin client when `serviceKey` was passed to `init()`. Otherwise `null`. |
+| `auth.getAuth()` | **Firebase only.** Returns the Firebase Auth instance. Throws if provider is not Firebase. |
+
+### User & session
+
+| Function | Description |
+|----------|-------------|
+| `auth.getUser()` | Returns the current user or `null`. Async. |
+| `auth.getSession()` | Returns the current session (shape depends on provider). Async. |
+
+### Sign in / up / out
+
+| Function | Description |
+|----------|-------------|
+| `auth.signInWithPassword(email, password)` | Sign in with email and password. Returns `{ user, session }` (or provider equivalent). Async. |
+| `auth.signUp(email, password, options?)` | Sign up with email and password. `options` is provider-specific (e.g. Supabase `emailRedirectTo`). Async. |
+| `auth.signOut()` | Sign out the current user. Async. |
+
+### OAuth & password reset (Supabase only)
+
+| Function | Description |
+|----------|-------------|
+| `auth.signInWithOAuth(options)` | Start OAuth sign-in (e.g. `{ provider: 'google' }`). Async. Throws if provider is not Supabase. |
+| `auth.resetPasswordForEmail(email, redirectTo?)` | Send password-reset email. Async. Throws if provider is not Supabase. |
+
+### Subscriptions
+
+| Function | Description |
+|----------|-------------|
+| `auth.onAuthStateChange(callback)` | Subscribe to auth state changes. `callback` receives `{ event, user, session }`. Returns an unsubscribe function. |
+
+**Example – callable functions in code:**
+
+```js
+const { auth } = require('guru-custom-auth-system');
+
+auth.init({ type: 'supabase', url: '...', anonKey: '...' });
+
+const user = await auth.getUser();
+const session = await auth.getSession();
+await auth.signInWithPassword('user@example.com', 'secret');
+await auth.signUp('new@example.com', 'secret', { emailRedirectTo: 'https://...' });
+await auth.signOut();
+
+const unsubscribe = auth.onAuthStateChange(({ event, user }) => {
+  console.log(event, user);
+});
+
+const client = auth.getClient();
+const admin = auth.getAdminClient();
+await auth.signInWithOAuth({ provider: 'google' });
+await auth.resetPasswordForEmail('user@example.com', 'https://app.com/reset');
+
+unsubscribe();
+```
 
 ## License
 
