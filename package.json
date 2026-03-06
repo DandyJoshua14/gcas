@@ -1,0 +1,43 @@
+{
+  "name": "guru-custom-auth-system",
+  "version": "0.0.1",
+  "description": "Unified auth library supporting Supabase, Firebase, and custom auth with a single init() API",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/esm/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.json",
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "supabase",
+    "firebase",
+    "custom-auth",
+    "unified-auth"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "firebase": "^10.0.0"
+  }
+}
